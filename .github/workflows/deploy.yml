@@ -1,0 +1,77 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: "eumiguel"
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: eumiguel/pi-projgestao:${{ github.sha }}
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: "ubuntu"
+          key: ${{ secrets.HOST_KEY }}
+          port: 22
+          script: |
+            docker network create app-network || true
+            docker run -d \
+              --name mongodb \
+              --network app-network \
+              --restart unless-stopped \
+              -e MONGO_INITDB_ROOT_USERNAME=${{ secrets.MONGO_USER }} \
+              -e MONGO_INITDB_ROOT_PASSWORD=${{ secrets.MONGO_PASS }} \
+              -v mongo_data:/data/db \
+              mongo:7 || true
+            docker stop payments-api || true
+            docker rm --force payments-api || true
+            docker run -d \
+              --name payments-api \
+              --network app-network \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              -e MONGO_USER=${{ secrets.MONGO_USER }} \
+              -e MONGO_PASS=${{ secrets.MONGO_PASS }} \
+              -e MONGO_HOST=mongodb \
+              eumiguel/pi-projgestao:${{ github.sha }}
