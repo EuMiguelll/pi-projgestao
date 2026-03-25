@@ -12,7 +12,6 @@ async def connect_db():
 
 
 async def close_db():
-    global client
     if client:
         client.close()
 
