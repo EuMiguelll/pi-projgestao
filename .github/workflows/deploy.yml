@@ -70,7 +70,7 @@ jobs:
               --name payments-api \
               --network app-network \
               --restart unless-stopped \
-              -p 8000:8000 \
+              -p 8080:8000 \
               -e MONGO_USER=${{ secrets.MONGO_USER }} \
               -e MONGO_PASS=${{ secrets.MONGO_PASS }} \
               -e MONGO_HOST=mongodb \

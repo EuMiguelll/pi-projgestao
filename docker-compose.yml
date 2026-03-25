@@ -16,7 +16,7 @@ services:
     container_name: payments-api
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8080:8000"
     environment:
       MONGO_USER: ${MONGO_USER}
       MONGO_PASS: ${MONGO_PASS}
